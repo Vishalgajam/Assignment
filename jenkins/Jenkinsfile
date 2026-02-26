@@ -113,7 +113,7 @@ pipeline {
         }
       }
   
-     */ stage('Wait for Cluster Ready') {
+     /* stage('Wait for Cluster Ready') {
         when { expression { currentBuild.result != "FAILURE" } }
         steps {
           sh '''
