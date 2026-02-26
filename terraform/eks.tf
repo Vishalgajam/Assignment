@@ -9,26 +9,11 @@ module "eks" {
   subnet_ids = aws_subnet.private[*].id
 
   enable_irsa = true
- cluster_endpoint_public_access = true
+ cluster_endpoint_public_access = false
  cluster_endpoint_private_access = true
 
   # 🚀 Added to grant admin access to the EC2 role
   enable_cluster_creator_admin_permissions = true
-
-  access_entries = {
-    management_node = {
-      # This matches the role ARN from your screenshot
-      principal_arn     = "arn:aws:iam::753923037164:role/Role_ec2"
-      policy_associations = {
-        admin = {
-          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-          access_scope = {
-            type = "cluster"
-          }
-        }
-      }
-    }
-  }
 
   create_kms_key                = false
   enable_kms_key_rotation       = false
