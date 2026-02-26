@@ -1,3 +1,6 @@
 apiVersion: v2
 name: web-app
-version: 0.1.0
+description: A lightweight Node.js app for EKS deployment
+type: application
+version: 0.1.0          # chart version (SemVer)
+appVersion: "1.0.0"     # application version (arbitrary string)
