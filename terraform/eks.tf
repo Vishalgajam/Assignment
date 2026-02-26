@@ -11,6 +11,11 @@ module "eks" {
   enable_irsa = true
  cluster_endpoint_public_access = false
  cluster_endpoint_private_access = true
+ 
+cluster_endpoint_public_access_cidrs = [
+  "3.239.81.58/32"
+]
+
 
   # 🚀 Added to grant admin access to the EC2 role
   enable_cluster_creator_admin_permissions = true
