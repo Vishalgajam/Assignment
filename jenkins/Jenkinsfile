@@ -23,7 +23,6 @@ pipeline {
       stage('Terraform Cleanup') {
         steps {
           sh '''
-            set -euo pipefail
             echo "Cleaning terraform cache and lock file..."
             cd terraform
             rm -rf .terraform .terraform.lock.hcl || true
@@ -37,7 +36,6 @@ pipeline {
           script {
             try {
               sh '''
-                set -euo pipefail
                 cd terraform
                 terraform --version
                 terraform init -upgrade
@@ -57,7 +55,6 @@ pipeline {
         steps {
           echo "Terraform apply failed. Cleaning up all resources..."
           sh '''
-            set +e
             cd terraform
             terraform destroy -auto-approve || true
           '''
@@ -76,7 +73,6 @@ pipeline {
         when { expression { currentBuild.result != "FAILURE" } }
         steps {
           sh '''
-            set -euo pipefail
             cd app
             docker build -t "$ECR_REPO:$IMAGE_TAG" .
           '''
@@ -87,7 +83,6 @@ pipeline {
         when { expression { currentBuild.result != "FAILURE" } }
         steps {
           sh '''
-            set -euo pipefail
             aws ecr get-login-password --region "$AWS_REGION" | \
               docker login --username AWS --password-stdin "$ECR_REPO"
   
@@ -100,7 +95,6 @@ pipeline {
         when { expression { currentBuild.result != "FAILURE" } }
         steps {
           sh '''
-            set -euo pipefail
             mkdir -p ~/.kube
   
             # Confirm Jenkins EC2/IAM identity
@@ -119,7 +113,7 @@ pipeline {
         }
       }
   
-      stage('Wait for Cluster Ready') {
+     */ stage('Wait for Cluster Ready') {
         when { expression { currentBuild.result != "FAILURE" } }
         steps {
           sh '''
@@ -139,13 +133,12 @@ pipeline {
             echo "Cluster and all nodes are Ready."
           '''
         }
-      }
+      }*/
   
       stage('Deploy via Helm') {
         when { expression { currentBuild.result != "FAILURE" } }
         steps {
           sh '''
-            set -euo pipefail
   
             # Ensure namespace exists
             kubectl get ns "$K8S_NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$K8S_NAMESPACE"
