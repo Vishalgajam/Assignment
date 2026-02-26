@@ -108,7 +108,7 @@ pipeline {
   
             # Quick smoke test
             kubectl config current-context
-            kubectl get ns
+            # kubectl get ns
           '''
         }
       }
@@ -141,17 +141,16 @@ pipeline {
           sh '''
   
             # Ensure namespace exists
-            kubectl get ns "$K8S_NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$K8S_NAMESPACE"
+            # kubectl get ns "$K8S_NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$K8S_NAMESPACE"
   
             # Deploy 
             helm upgrade --install webapp "$HELM_CHART_PATH" \
-              --namespace "$K8S_NAMESPACE" --create-namespace \
               --atomic --timeout 10m0s \
               --set image.repository="$ECR_REPO" \
               --set image.tag="$IMAGE_TAG"
   
             # Post-deploy status
-            kubectl -n "$K8S_NAMESPACE" get deploy,po,svc,ingress || true
+            # kubectl -n "$K8S_NAMESPACE" get deploy,po,svc,ingress || true
           '''
         }
       }
