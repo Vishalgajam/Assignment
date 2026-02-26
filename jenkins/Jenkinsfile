@@ -1,0 +1,166 @@
+pipeline {
+  agent any
+
+  environment {
+    AWS_REGION        = "us-east-1"
+    REPO_NAME         = "webapp"
+    ECR_REPO          = "753923037164.dkr.ecr.us-east-1.amazonaws.com/webapp"
+    IMAGE_TAG         = "latest"
+    HELM_CHART_PATH   = "helm-chart"
+    K8S_NAMESPACE     = "webapp"
+    CLUSTER_NAME      = "devops-eks"
+    EKS_WAIT_SECONDS  = "180"
+  }
+
+  stages {
+      stage('Checkout Code') {
+          steps {
+              git branch: 'main', 
+                  url: 'https://github.com/Vishalgajam/DevOps_assignment.git'
+          }
+      }
+  
+      stage('Terraform Cleanup') {
+        steps {
+          sh '''
+            set -euo pipefail
+            echo "Cleaning terraform cache and lock file..."
+            cd terraform
+            rm -rf .terraform .terraform.lock.hcl || true
+            echo "Cleanup done. Ready for terraform init."
+          '''
+        }
+      }
+  
+      stage('Terraform Init & Apply') {
+        steps {
+          script {
+            try {
+              sh '''
+                set -euo pipefail
+                cd terraform
+                terraform --version
+                terraform init -upgrade
+                terraform apply -auto-approve
+              '''
+            } catch (err) {
+              echo "Terraform Apply failed!"
+              currentBuild.result = "FAILURE"
+              throw err
+            }
+          }
+        }
+      }
+  
+      stage('Terraform Destroy on Failure') {
+        when { expression { currentBuild.result == "FAILURE" } }
+        steps {
+          echo "Terraform apply failed. Cleaning up all resources..."
+          sh '''
+            set +e
+            cd terraform
+            terraform destroy -auto-approve || true
+          '''
+        }
+      }
+  
+      stage('Post-Terraform Wait') {
+        when { expression { currentBuild.result != "FAILURE" } }
+        steps {
+          echo "Sleeping for ${EKS_WAIT_SECONDS} seconds to allow EKS to stabilize..."
+          sleep(time: EKS_WAIT_SECONDS as Integer, unit: 'SECONDS')
+        }
+      }
+  
+      stage('Build Docker Image') {
+        when { expression { currentBuild.result != "FAILURE" } }
+        steps {
+          sh '''
+            set -euo pipefail
+            cd app
+            docker build -t "$ECR_REPO:$IMAGE_TAG" .
+          '''
+        }
+      }
+  
+      stage('Push Docker Image to ECR') {
+        when { expression { currentBuild.result != "FAILURE" } }
+        steps {
+          sh '''
+            set -euo pipefail
+            aws ecr get-login-password --region "$AWS_REGION" | \
+              docker login --username AWS --password-stdin "$ECR_REPO"
+  
+            docker push "$ECR_REPO:$IMAGE_TAG"
+          '''
+        }
+      }
+  
+      stage('Configure kubeconfig') {
+        when { expression { currentBuild.result != "FAILURE" } }
+        steps {
+          sh '''
+            set -euo pipefail
+            mkdir -p ~/.kube
+  
+            # Confirm Jenkins EC2/IAM identity
+            aws sts get-caller-identity
+  
+            # Create/refresh kubeconfig for the jenkins user (instance profile is used automatically)
+            aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION" ${AWS_ROLE_ARN:+--role-arn $AWS_ROLE_ARN}
+  
+            echo "---- kubeconfig exec apiVersion ----"
+            grep -n "client.authentication.k8s.io" ~/.kube/config || true
+  
+            # Quick smoke test
+            kubectl config current-context
+            kubectl get ns
+          '''
+        }
+      }
+  
+      stage('Wait for Cluster Ready') {
+        when { expression { currentBuild.result != "FAILURE" } }
+        steps {
+          sh '''
+            set -euo pipefail
+            echo "Waiting for EKS API endpoint..."
+            until kubectl version --request-timeout=5s --client=false >/dev/null 2>&1; do
+              echo "API not ready yet..."
+              sleep 10
+            done
+  
+            echo "Waiting for worker nodes to become Ready..."
+            until kubectl get nodes --no-headers 2>/dev/null | grep -q "Ready"; do
+              echo "Nodes not ready yet..."
+              sleep 10
+            done
+  
+            echo "Cluster and all nodes are Ready."
+          '''
+        }
+      }
+  
+      stage('Deploy via Helm') {
+        when { expression { currentBuild.result != "FAILURE" } }
+        steps {
+          sh '''
+            set -euo pipefail
+  
+            # Ensure namespace exists
+            kubectl get ns "$K8S_NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$K8S_NAMESPACE"
+  
+            # Deploy 
+            helm upgrade --install webapp "$HELM_CHART_PATH" \
+              --namespace "$K8S_NAMESPACE" --create-namespace \
+              --atomic --timeout 10m0s \
+              --set image.repository="$ECR_REPO" \
+              --set image.tag="$IMAGE_TAG"
+  
+            # Post-deploy status
+            kubectl -n "$K8S_NAMESPACE" get deploy,po,svc,ingress || true
+          '''
+        }
+      }
+    }
+  }

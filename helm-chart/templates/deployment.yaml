@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+    spec:
+      containers:
+      - name: webapp
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 3000
+
+        env:
+        - name: APP_MESSAGE
+          value: {{ .Values.env.APP_MESSAGE | quote }}
+
+        volumeMounts:
+        - name: config-volume
+          mountPath: {{ .Values.volume.mountPath }}
+
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.liveness.path }}
+            port: {{ .Values.liveness.port }}
+          initialDelaySeconds: {{ .Values.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.liveness.periodSeconds }}
+          timeoutSeconds: {{ .Values.liveness.timeoutSeconds }}
+          failureThreshold: {{ .Values.liveness.failureThreshold }}
+          successThreshold: {{ .Values.liveness.successThreshold }}
+
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.readiness.path }}
+            port: {{ .Values.readiness.port }}
+          initialDelaySeconds: {{ .Values.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readiness.periodSeconds }}
+          timeoutSeconds: {{ .Values.readiness.timeoutSeconds }}
+          failureThreshold: {{ .Values.readiness.failureThreshold }}
+          successThreshold: {{ .Values.readiness.successThreshold }}
+
+        {{- if .Values.startup.enabled }}
+        startupProbe:
+          httpGet:
+            path: {{ .Values.startup.path }}
+            port: {{ .Values.startup.port }}
+          initialDelaySeconds: {{ .Values.startup.initialDelaySeconds }}
+          periodSeconds: {{ .Values.startup.periodSeconds }}
+          timeoutSeconds: {{ .Values.startup.timeoutSeconds }}
+          failureThreshold: {{ .Values.startup.failureThreshold }}
+        {{- end }}
+
+      volumes:
+      - name: config-volume
+        configMap:
+          name: webapp-config

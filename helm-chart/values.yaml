@@ -1,0 +1,61 @@
+apiVersion: v2
+name: web-app
+description: A lightweight Node.js app for EKS deployment
+version: 0.1.0
+appVersion: "1.0"
+
+helm-chart/values.yaml
+
+replicaCount: 2
+
+image:
+  repository: 753923037164.dkr.ecr.us-east-1.amazonaws.com/webapp
+  tag: "latest"
+  pullPolicy: Always
+
+service:
+  type: LoadBalancer
+  port: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: "myapp.example.com"
+
+env:
+  APP_MESSAGE: "Hello from Helm Values!"
+
+configData:
+  message: "This is a config file managed by a Helm ConfigMap"
+
+volume:
+  mountPath: "/config"
+
+resources: {}
+
+liveness:
+  path: /
+  port: 3000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
+  successThreshold: 1
+
+readiness:
+  path: /
+  port: 3000
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 2
+  failureThreshold: 3
+  successThreshold: 1
+
+startup:
+  enabled: false
+  path: /
+  port: 3000
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 2
+  failureThreshold: 12
