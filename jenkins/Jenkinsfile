@@ -143,7 +143,7 @@ pipeline {
             helm repo update
       
             # Deploy (install or upgrade)
-            helm upgrade --install webapp myrepo/webapp \
+            helm upgrade --install webapp myrepo/web-app \
               --version 0.1.0 \
               --atomic --timeout 10m \
               --set image.repository=$ECR_REPO \
