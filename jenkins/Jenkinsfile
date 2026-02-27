@@ -136,21 +136,18 @@ pipeline {
       }*/
   
       stage('Deploy via Helm') {
-        when { expression { currentBuild.result != "FAILURE" } }
         steps {
           sh '''
-  
-            # Ensure namespace exists
-            # kubectl get ns "$K8S_NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$K8S_NAMESPACE"
-  
-            # Deploy 
-            helm upgrade --install webapp "$HELM_CHART_PATH" \
-              --atomic --timeout 10m0s \
-              --set image.repository="$ECR_REPO" \
-              --set image.tag="$IMAGE_TAG"
-  
-            # Post-deploy status
-            # kubectl -n "$K8S_NAMESPACE" get deploy,po,svc,ingress || true
+            # Add Helm repo pointing to S3
+            helm repo add myrepo https://my-helm-bucketrepo.s3.amazonaws.com
+            helm repo update
+      
+            # Deploy (install or upgrade)
+            helm upgrade --install webapp myrepo/webapp \
+              --version 0.1.0 \
+              --atomic --timeout 10m \
+              --set image.repository=$ECR_REPO \
+              --set image.tag=$IMAGE_TAG
           '''
         }
       }
